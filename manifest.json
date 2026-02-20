@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "LockInTube",
+  "version": "1.0",
+  "description": "Filter YouTube recommendations by topics.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://*.youtube.com/*"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.youtube.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}

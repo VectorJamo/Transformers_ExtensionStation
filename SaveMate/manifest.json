@@ -1,19 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "SaveMate",
+  "name": "SaveMate Test",
   "version": "1.0",
-  "description": "Compare prices across stores and track your savings!",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "description": "Test Chrome extension popup",
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": "icons/icon.png"
   },
-  "content_scripts": [
-    {
-      "matches": ["*://*.walmart.ca/*", "*://*.amazon.ca/*", "*://*.canadiantire.ca/*"],
-      "js": ["content.js"]
-    }
-  ],
   "icons": {
     "128": "icons/icon.png"
   }

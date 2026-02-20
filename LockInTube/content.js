@@ -11,16 +11,14 @@ function filterVideos() {
 
       if (!matches) {
         video.remove();
-        console.log("Removed:", title);
       }
     }
 
-    // 1️⃣ Filter all currently rendered videos
+    // 1. Filter all currently rendered videos
     const videos = document.querySelectorAll("ytd-rich-item-renderer, ytd-compact-video-renderer");
-    console.log("Total videos initially found:", videos.length);
     videos.forEach(video => filterVideoCard(video));
 
-    // 2️⃣ Observe the DOM for newly added video cards
+    // 2️. Observe the DOM for newly added video cards
     const observer = new MutationObserver(mutations => {
       mutations.forEach(mutation => {
         mutation.addedNodes.forEach(node => {
@@ -39,7 +37,6 @@ function filterVideos() {
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
-    console.log("MutationObserver started: new videos will be filtered automatically.");
   });
 }
 
@@ -49,7 +46,6 @@ function waitForTitles() {
   const anyTitle = Array.from(videos).some(video => video.querySelector(".yt-core-attributed-string")?.textContent?.trim());
 
   if (!anyTitle) {
-    console.log("Titles not loaded yet, retrying in 500ms...");
     setTimeout(waitForTitles, 500);
     return;
   }

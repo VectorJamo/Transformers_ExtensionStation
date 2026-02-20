@@ -1,10 +1,9 @@
 const addBtn = document.getElementById("addTag");
 const input = document.getElementById("tagInput");
-const resetButton = document.getElementById("resetFilters");
+const resetButton = document.getElementById("clearTagsBtn");
 const reloadButton = document.getElementById("reloadPage");
 
 addBtn.addEventListener("click", () => {
-  console.log("Button clicked.");
   const tag = input.value.trim().toLowerCase();
   if (!tag) return;
 
@@ -22,8 +21,6 @@ addBtn.addEventListener("click", () => {
 resetButton.addEventListener("click", () => {
   // Clear tags in chrome.storage
   chrome.storage.sync.set({ tags: [] }, () => {
-    console.log("All filters cleared!");
-    
     // Optional: clear the UI list
     const tagList = document.getElementById("tagList");
     tagList.innerHTML = "";
@@ -51,7 +48,5 @@ function renderTags() {
   });
 
 }
-
-
 
 renderTags();

@@ -56,31 +56,52 @@ function waitForTitles() {
 // Start the script
 waitForTitles();
 
-function blockBlacklistedSearch() {
-  chrome.storage.sync.get(["blacklist"], (result) => {
-    const blacklist = result.blacklist || [];
-    console.log("BLACKLISTED TERMS:", blacklist);
+// Store the current blacklist in memory
+let currentBlacklist = [];
 
-    const input = document.querySelector(".ytSearchboxComponentInput");
-    if (!input) return;
-
-    input.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") {
-        const query = input.value.toLowerCase();
-
-        const isBlocked = blacklist.some(word =>
-          query.includes(word.toLowerCase())
-        );
-
-        if (isBlocked) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          alert("This search term is blocked by your YouTube Filter.");
-          input.value = "";
-        }
-      }
-    }, true); // capture phase is important
+// Fetch blacklist from local storage initially
+function fetchBlacklist() {
+  chrome.storage.local.get(["blacklist"], (result) => {
+    currentBlacklist = result.blacklist || [];
+    console.log("Blacklist fetched (local):", currentBlacklist);
   });
 }
 
+// Initial fetch
+fetchBlacklist();
+
+// Listen for updates if popup changes the blacklist
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.blacklist) {
+    currentBlacklist = changes.blacklist.newValue || [];
+    console.log("Blacklist updated (local):", currentBlacklist);
+  }
+});
+
+// Main function to block searches
+function blockBlacklistedSearch() {
+  const input = document.querySelector(".ytSearchboxComponentInput");
+  if (!input) return;
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      const query = input.value.toLowerCase();
+      console.log("ENTER KEY IS PRESSED!");
+      console.log("Current blacklist:", currentBlacklist);
+
+      const isBlocked = currentBlacklist.some(word =>
+        query.includes(word.toLowerCase())
+      );
+
+      if (isBlocked) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        alert("This search term is blocked by your YouTube Filter.");
+        input.value = "";
+      }
+    }
+  }, true); // use capture phase to intercept early
+}
+
+// Run the function
 blockBlacklistedSearch();

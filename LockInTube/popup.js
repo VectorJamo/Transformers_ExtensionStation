@@ -3,8 +3,10 @@ const input = document.getElementById("tagInput");
 const resetButton = document.getElementById("clearTagsBtn");
 const reloadButton = document.getElementById("reloadPage");
 
-const blackListTagInput = document.getElementById("blacklistTagInput");
+const blackListTagInput = document.getElementById("blackListTagInput");
 const blackListAddBtn = document.getElementById("blackListAddTag");
+
+console.log("SCRIPT LOADED");
 
 addBtn.addEventListener("click", () => {
   const tag = input.value.trim().toLowerCase();
@@ -52,5 +54,57 @@ function renderTags() {
 
 renderTags();
 
-// Blacklisting
-chrome.storage.sync.set({ blacklist: ["gaming", "gta"] });
+// Initialize default blacklist if it doesn't exist
+chrome.storage.local.get(["blacklist"], (result) => {
+  if (!result.blacklist) {
+    chrome.storage.local.set({
+      blacklist: ["gaming", "vlog", "drama"]
+    });
+  }
+});
+
+// Add new blacklist item
+blackListAddBtn.addEventListener("click", () => {
+  console.log("Blacklist add button clicked.");
+
+  const tag = blackListTagInput.value.trim().toLowerCase();
+  if (!tag) return;
+
+  console.log("Check 1 Passed");
+
+  chrome.storage.local.get(["blacklist"], (result) => {
+    const blacklist = result.blacklist || [];
+
+    if (!blacklist.includes(tag)) {
+      blacklist.push(tag);
+    }
+
+    chrome.storage.local.set({ blacklist }, () => {
+      console.log("BLACKLIST SAVED!");
+      blackListTagInput.value = "";
+      renderBlackListTags();
+    });
+  });
+});
+
+// Render blacklist in popup
+function renderBlackListTags() {
+  chrome.storage.local.get(["blacklist"], (result) => {
+    const blacklist = result.blacklist || [];
+    const tagList = document.getElementById("blackListTagList");
+
+    tagList.innerHTML = "";
+
+    console.log("BLACKLIST TAGS:");
+    console.log(blacklist);
+
+    blacklist.forEach(tag => {
+      const li = document.createElement("li");
+      li.textContent = tag;
+      tagList.appendChild(li);
+    });
+  });
+}
+
+// Initial render
+renderBlackListTags();

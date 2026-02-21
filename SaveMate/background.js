@@ -347,55 +347,16 @@ async function runComparison(product) {
   const query = buildSearchQuery(product.title);
   if (!query) return [];
 
-  console.log(`[SaveMate] ============================`);
-  console.log(`[SaveMate] Product: "${product.title.substring(0, 70)}"`);
-  console.log(`[SaveMate] Query:   "${query}"`);
-  console.log(`[SaveMate] Site:    ${product.site}`);
-
-  // 🔹 ONE API CALL ONLY
-  console.log("🔎 Searching:", query);
-  const serpResults = await searchSerpAPI(query);
+  console.log(`[SaveMate] Searching: "${query}" for "${product.title}"`);
+  const serpResults = await searchSerpAPI(query, product.title);
 
   if (!serpResults.length) {
-    console.log('[SaveMate] SerpAPI returned no results');
+    console.log('[SaveMate] No relevant SerpAPI results');
     return [];
   }
 
-  // Remove current site
-  const filtered = serpResults.filter(r => r.siteKey !== product.site);
-
-  // Score relevance for each result
-  const scored = filtered.map(r => ({
-    ...r,
-    relevanceScore: scoreRelevance(query, r.title),
-  })).filter(r => r.relevanceScore >= MIN_RELEVANCE_SCORE);
-
-  // Per site: keep only the lowest-priced relevant result
-  const bestPerSite = {};
-  for (const r of scored) {
-    const existing = bestPerSite[r.siteKey];
-    if (!existing || r.price < existing.price) {
-      bestPerSite[r.siteKey] = r;
-    }
-  }
-
-  // Relevance filtering using your existing scorer
-  // const verified = filtered
-  //   .map(r => ({
-  //     ...r,
-  //     relevanceScore: scoreRelevance(query, r.title)
-  //   }))
-  //   .filter(r => r.relevanceScore >= MIN_RELEVANCE_SCORE)
-  //   .sort((a, b) => b.relevanceScore - a.relevanceScore)
-  //   .slice(0, 6); // limit results
-
-  const verified = Object.values(bestPerSite)
-    .sort((a, b) => a.price - b.price); // cheapest first
-
-
-  console.log(`[SaveMate] Done: ${verified.length} verified from SerpAPI`);
-
-  return verified;
+  console.log(`[SaveMate] Found ${serpResults.length} relevant results`);
+  return serpResults; // each result has best url
 }
 
 // ─── SAVINGS TRACKING ────────────────────────────────────────
@@ -404,7 +365,11 @@ async function recordPurchase(product) {
   const { lastComparison } = await chrome.storage.local.get('lastComparison');
   let saved = 0;
   if (lastComparison?.prices?.length && product.price) {
-    const others = lastComparison.prices.map(p => p.price).filter(Boolean);
+    const others = lastComparison.prices
+      .filter(p => p.siteKey !== product.site) // exclude the current site
+      .map(p => p.price)
+      .filter(Boolean);
+
     if (others.length) {
       const diff = product.price - Math.min(...others);
       if (diff > 0) saved = diff;
@@ -432,7 +397,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
     const tab = await chrome.tabs.get(tabId);
     if (!isShoppingUrl(tab.url)) {
       await chrome.storage.local.remove('lastComparison');
-      chrome.action.setBadgeText({ text: '' });
+      // chrome.action.setBadgeText({ text: '' });
     } else {
       const key  = `tab_${tabId}`;
       const data = await chrome.storage.local.get(key);
@@ -442,13 +407,13 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
         if (r.prices?.length && r.product?.price) {
           const lowest = Math.min(...r.prices.map(p => p.price).filter(Boolean));
           if (lowest < r.product.price) {
-            chrome.action.setBadgeText({ text: `$${(r.product.price - lowest).toFixed(0)}`, tabId });
-            chrome.action.setBadgeBackgroundColor({ color: '#00b894', tabId });
+            // chrome.action.setBadgeText({ text: `$${(r.product.price - lowest).toFixed(0)}`, tabId });
+            // chrome.action.setBadgeBackgroundColor({ color: '#00b894', tabId });
           }
         }
       } else {
         await chrome.storage.local.remove('lastComparison');
-        chrome.action.setBadgeText({ text: '', tabId });
+        // chrome.action.setBadgeText({ text: '', tabId });
       }
     }
   } catch (_) {}
@@ -464,7 +429,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (active?.id === tabId) {
         await chrome.storage.local.remove('lastComparison');
-        chrome.action.setBadgeText({ text: '', tabId });
+        // chrome.action.setBadgeText({ text: '', tabId });
       }
     }
   }
@@ -498,15 +463,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const record = { ...init, prices, status: 'done' };
         await chrome.storage.local.set({ [tabKey]: record, lastComparison: record });
 
-        if (msg.product.price && prices.length) {
-          const lowest = Math.min(...prices.map(p => p.price).filter(Boolean));
-          if (lowest < msg.product.price) {
-            chrome.action.setBadgeText({ text: `$${(msg.product.price - lowest).toFixed(0)}`, tabId });
-            chrome.action.setBadgeBackgroundColor({ color: '#00b894', tabId });
-          } else {
-            chrome.action.setBadgeText({ text: '', tabId });
-          }
-        }
+        // if (msg.product.price && prices.length) {
+        //   const lowest = Math.min(...prices.map(p => p.price).filter(Boolean));
+        //   if (lowest < msg.product.price) {
+        //     chrome.action.setBadgeText({ text: `$${(msg.product.price - lowest).toFixed(0)}`, tabId });
+        //     chrome.action.setBadgeBackgroundColor({ color: '#00b894', tabId });
+        //   } else {
+        //     chrome.action.setBadgeText({ text: '', tabId });
+        //   }
+        // }
 
         sendResponse(record);
       } catch (err) {
@@ -528,7 +493,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'CLEAR_COMPARISON') {
     const tabId = sender.tab?.id;
     const keys  = ['lastComparison'];
-    if (tabId) { keys.push(`tab_${tabId}`); chrome.action.setBadgeText({ text: '', tabId }); }
+    if (tabId) { keys.push(`tab_${tabId}`); 
+    // chrome.action.setBadgeText({ text: '', tabId }); 
+  }
     chrome.storage.local.remove(keys);
     return true;
   }
@@ -559,50 +526,99 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 // background.js
-async function searchSerpAPI(query) {
+// async function searchSerpAPI(query) {
+//   const apiKey = 'ac477310b2fa9590006ea7b90126f449b42fb077486144ec8135111890ef4089';
+//   const url = `https://serpapi.com/search.json?engine=google_shopping&q=${encodeURIComponent(query)}&gl=ca&hl=en&api_key=${apiKey}`;
+
+//   try {
+//     const response = await fetch(url);
+//     const data = await response.json();
+
+//     if (!data.shopping_results) return [];
+
+//     return data.shopping_results.map(item => {
+//       const price = parseFloat(
+//         (item.price || '')
+//           .replace(/[^\d.]/g, '')
+//       );
+
+//       if(!price || price <= 0){
+//         return null;
+//       }
+
+//       const source = (item.source || '').toLowerCase();
+
+//       let siteKey = null;
+//       if (source.includes('amazon')) siteKey = 'amazon';
+//       if (source.includes('walmart')) siteKey = 'walmart';
+//       if (source.includes('best buy')) siteKey = 'bestbuy';
+//       if (source.includes('superstore')) siteKey = 'superstore';
+
+//       // Only keep results from our four supported stores
+//       if (!siteKey) return null;
+      
+//       return {
+//         siteKey,
+//         siteName: item.source,
+//         price: price,
+//         url:
+//           item.product_link ||
+//           item.link ||
+//           item.serpapi_link ||
+//           null,
+//         title: item.title || '',
+//         relevanceScore: 0
+//       };
+//     }).filter(Boolean);
+//   } catch (err) {
+//     console.error('[SaveMate] SerpAPI error:', err);
+//     return [];
+//   }
+// }
+
+async function searchSerpAPI(query, originalTitle) {
   const apiKey = 'ac477310b2fa9590006ea7b90126f449b42fb077486144ec8135111890ef4089';
   const url = `https://serpapi.com/search.json?engine=google_shopping&q=${encodeURIComponent(query)}&gl=ca&hl=en&api_key=${apiKey}`;
 
   try {
     const response = await fetch(url);
     const data = await response.json();
-
     if (!data.shopping_results) return [];
 
-    return data.shopping_results.map(item => {
-      const price = parseFloat(
-        (item.price || '')
-          .replace(/[^\d.]/g, '')
-      );
-
-      if(!price || price <= 0){
-        return null;
-      }
+    // Map and normalize results
+    const results = data.shopping_results.map(item => {
+      const price = parseFloat((item.price || '').replace(/[^\d.]/g, ''));
+      if (!price || price <= 0) return null;
 
       const source = (item.source || '').toLowerCase();
-
       let siteKey = null;
       if (source.includes('amazon')) siteKey = 'amazon';
       if (source.includes('walmart')) siteKey = 'walmart';
       if (source.includes('best buy')) siteKey = 'bestbuy';
       if (source.includes('superstore')) siteKey = 'superstore';
-
-      // Only keep results from our four supported stores
       if (!siteKey) return null;
-      
+
       return {
         siteKey,
         siteName: item.source,
-        price: price,
-        url:
-          item.product_link ||
-          item.link ||
-          item.serpapi_link ||
-          null,
+        price,
+        url: item.product_link || item.link || item.serpapi_link || null,
         title: item.title || '',
-        relevanceScore: 0
+        relevanceScore: scoreRelevance(originalTitle, item.title || '')
       };
     }).filter(Boolean);
+
+    // Filter only relevant results
+    const relevant = results.filter(r => r.relevanceScore >= MIN_RELEVANCE_SCORE);
+
+    // Keep only the best per site (lowest price)
+    const bestPerSite = {};
+    for (const r of relevant) {
+      const existing = bestPerSite[r.siteKey];
+      if (!existing || r.price < existing.price) bestPerSite[r.siteKey] = r;
+    }
+
+    return Object.values(bestPerSite).sort((a, b) => a.price - b.price);
   } catch (err) {
     console.error('[SaveMate] SerpAPI error:', err);
     return [];

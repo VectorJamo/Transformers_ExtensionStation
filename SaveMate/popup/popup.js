@@ -209,6 +209,11 @@ function pollUntilDone(product, attempts = 0) {
   }, 1500);
 }
 
+document.getElementById('addSiteBtn').addEventListener('click', () => {
+  alert('Add site feature coming soon!');
+  // Future: open input/modal to add a new site to track
+});
+
 // ─── ANIMATION ───────────────────────────────────────────────
 
 function injectPulseStyle() {

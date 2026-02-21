@@ -83,6 +83,7 @@ function renderPriceCards(product, prices, isSearching = false) {
   const lowestPrice = validPrices.length ? Math.min(...validPrices) : null;
 
   allSites.forEach(site => {
+    console.log("UI card:", site.name, "URL:", site.url);
     const isBest    = lowestPrice != null && site.price != null && site.price === lowestPrice;
     const card      = document.createElement('div');
     card.className  = isBest ? 'price-card best' : 'price-card';
@@ -200,6 +201,7 @@ function pollUntilDone(product, attempts = 0) {
   setTimeout(async () => {
     const data = await msg('GET_COMPARISON');
     if (data?.status === 'done') {
+      renderProductName(data.product);
       renderPriceCards(data.product, data.prices);
     } else {
       pollUntilDone(data?.product || product, attempts + 1);

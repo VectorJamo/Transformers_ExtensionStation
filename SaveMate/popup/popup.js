@@ -1,6 +1,3 @@
-// ============================================================
-// SaveMate — popup/popup.js
-// ============================================================
 
 function msg(type, data = {}) {
   return new Promise(resolve =>
@@ -98,33 +95,50 @@ function renderPriceCards(product, prices, isSearching = false) {
 
     const priceDisplay = site.price != null
       ? fmt(site.price)
-      : (site.isCurrentSite ? 'Current site' : 'Not found');
+      : (site.isCurrentSite ? 'Current page' : 'No exact match');
 
-    const priceColor = site.price == null ? 'color:#666;font-size:13px;font-weight:normal' : '';
+    const priceColor = site.price == null
+      ? 'color:#666;font-size:13px;font-weight:normal'
+      : '';
+
+    // Confidence badge (only for comparison sites, not current)
+    let confidenceBadge = '';
+    if (!site.isCurrentSite && site.price != null && site.relevanceScore != null) {
+      const pct = Math.round(site.relevanceScore * 100);
+      const color = pct >= 85 ? '#00b894' : pct >= 70 ? '#f39c12' : '#e74c3c';
+      confidenceBadge = `<span style="font-size:10px;color:${color};margin-left:4px">${pct}% match</span>`;
+    }
 
     let savings = '';
     if (!site.isCurrentSite && site.price != null && product.price != null) {
       const diff = product.price - site.price;
       if (diff > 0.01) {
-        savings = `<span style="color:#00b894;font-size:11px;font-weight:bold">Save ${fmt(diff)}</span>`;
+        savings = `<span style="color:#00b894;font-size:11px;font-weight:bold">Save ~${fmt(diff)}</span>`;
       } else if (diff < -0.01) {
-        savings = `<span style="color:#e74c3c;font-size:11px">+${fmt(-diff)} more</span>`;
+        savings = `<span style="color:#e74c3c;font-size:11px">~+${fmt(-diff)} more</span>`;
       } else {
-        savings = `<span style="color:#aaa;font-size:11px">Same price</span>`;
+        savings = `<span style="color:#aaa;font-size:11px">Similar price</span>`;
       }
     }
 
+    // "No exact match" explanation tooltip
+    const noMatchNote = (!site.isCurrentSite && site.price == null)
+      ? `<span style="color:#556;font-size:10px;display:block;margin-top:3px">Product not found or filtered as inaccurate</span>`
+      : '';
+
     card.innerHTML = `
-      <div>
+      <div style="flex:1;min-width:0">
         <p class="site">
           ${site.name}
           ${site.isCurrentSite ? '<span class="badge" style="background:#555">You\'re here</span>' : ''}
           ${isBest            ? '<span class="badge">Lowest ✓</span>'                              : ''}
+          ${confidenceBadge}
         </p>
         <h3 style="${priceColor}">${priceDisplay}</h3>
         ${savings}
+        ${noMatchNote}
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
         ${site.price != null ? '<span class="stock">In Stock</span>' : ''}
         ${site.url ? `<span style="color:#4c6fff;font-size:11px;font-weight:bold">View →</span>` : ''}
       </div>
@@ -163,11 +177,12 @@ function buildSitesList(product, prices) {
   for (const siteKey of otherSites) {
     const found = prices.find(p => p.siteKey === siteKey);
     result.push({
-      key:           siteKey,
-      name:          ALL_SITES[siteKey],
-      price:         found?.price ?? null,
-      url:           found?.url   ?? null,
-      isCurrentSite: false,
+      key:            siteKey,
+      name:           ALL_SITES[siteKey],
+      price:          found?.price          ?? null,
+      url:            found?.url            ?? null,
+      relevanceScore: found?.relevanceScore ?? null,
+      isCurrentSite:  false,
     });
   }
 

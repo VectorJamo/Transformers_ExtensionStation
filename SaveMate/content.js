@@ -1,10 +1,3 @@
-// ============================================================
-// SaveMate — content.js
-// Detects product + price on Amazon CA, Walmart CA,
-// Best Buy CA, and Superstore CA.
-// Title extracted from URL slug (most reliable, no React delay).
-// Price extracted from DOM with multiple fallback selectors.
-// ============================================================
 
 const hostname = window.location.hostname;
 
@@ -26,9 +19,11 @@ if (!CURRENT_SITE) {
 function isProductPage() {
   const path = window.location.pathname;
   if (CURRENT_SITE === 'amazon')     return /\/dp\/[A-Z0-9]{10}/i.test(path);
-  if (CURRENT_SITE === 'walmart')    return path.includes('/ip/');
+  // Walmart CA uses /en/ip/... or /ip/... 
+  if (CURRENT_SITE === 'walmart')    return /\/ip\//.test(path);
   if (CURRENT_SITE === 'bestbuy')    return path.includes('/en-ca/product/') || /\/\d+\.aspx/.test(path);
-  if (CURRENT_SITE === 'superstore') return path.includes('/p/') || path.includes('/product/');
+  // Superstore uses /p/name/code or just check for a product code at end
+  if (CURRENT_SITE === 'superstore') return path.includes('/p/') || path.includes('/product/') || /\/\d{5,}/.test(path);
   return false;
 }
 
@@ -39,12 +34,19 @@ function getTitleFromUrl() {
   const path = window.location.pathname;
   try {
     if (CURRENT_SITE === 'walmart') {
-      // /en/ip/Product-Name-Here/ID  OR  /ip/Product-Name/ID
+      // Walmart CA: /en/ip/Product-Name-Here/ID  OR  /ip/Product-Name/ID
       const parts = path.split('/');
       const ipIdx = parts.indexOf('ip');
       if (ipIdx >= 0 && parts[ipIdx + 1]) {
-        return parts[ipIdx + 1].replace(/-/g, ' ').trim();
+        const slug = parts[ipIdx + 1];
+        // Skip if it's a pure numeric ID (sometimes Walmart puts ID first)
+        if (!/^\d+$/.test(slug)) {
+          return slug.replace(/-/g, ' ').trim();
+        }
       }
+      // Fallback: DOM h1 (Walmart renders this quickly)
+      const h1 = document.querySelector('h1[itemprop="name"], h1[class*="prod-title"], h1');
+      if (h1) return h1.textContent.trim().split('\n')[0].trim();
     }
 
     if (CURRENT_SITE === 'amazon') {
@@ -72,11 +74,22 @@ function getTitleFromUrl() {
     }
 
     if (CURRENT_SITE === 'superstore') {
-      // /p/Product-Name/ID  OR  /product/Product-Name
+      // Superstore URL: /p/Product-Name-Here/21302823_EA
+      // The slug BEFORE the last segment is the name; the last is a numeric code
       const parts = path.split('/').filter(Boolean);
-      const pIdx = parts.findIndex(p => p === 'p' || p === 'product');
+      const pIdx  = parts.findIndex(p => p === 'p' || p === 'product');
       if (pIdx >= 0 && parts[pIdx + 1]) {
-        return parts[pIdx + 1].replace(/-/g, ' ').trim();
+        const candidate = parts[pIdx + 1];
+        // Skip if it's a pure numeric/code segment like "21302823_EA" or "123456"
+        const isCode = /^[\d_]+$/.test(candidate) || /^\d+[_A-Z]+$/i.test(candidate);
+        if (!isCode) {
+          return candidate.replace(/-/g, ' ').trim();
+        }
+      }
+      // Fallback: use the page <title> — Superstore sets it to the product name
+      const titleEl = document.querySelector('title, h1');
+      if (titleEl) {
+        return titleEl.textContent.split('|')[0].split('-')[0].split(':')[0].trim();
       }
     }
   } catch (_) {}
@@ -116,11 +129,18 @@ const PRICE_SELECTORS = {
     '.a-price .a-offscreen',
   ],
   walmart: [
-    '[itemprop="price"]',                 // Structured data — most reliable
+    // Walmart CA — try every known price selector pattern
     '[data-automation="buybox-price"]',
+    'span[data-automation="buybox-price"]',
     '[data-testid="price-wrap"] span',
+    '[data-testid="buybox-price-container"] span',
+    '[class*="PriceDisplay"] [class*="price"]',
+    '[class*="buybox"] [class*="price"]',
+    '[itemprop="price"]',
     '.price-characteristic',
-    'span.price-group',
+    '[class*="priceDisplay"]',
+    '[class*="price-group"]',
+    'span[class*="price"]',
   ],
   bestbuy: [
     '[data-automation="product-price"]',

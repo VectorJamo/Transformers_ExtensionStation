@@ -1,4 +1,4 @@
-# ◈ ExtensionHub
+# ◈ ExtensionHub(ExtensionStation)
 
 A single Chrome extension combining three everyday browser tools — a price comparator, a YouTube focus filter, and an AI powered page summarizer.
 

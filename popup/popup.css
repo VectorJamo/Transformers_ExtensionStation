@@ -45,7 +45,7 @@ body {
 }
 
 .logo-text {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.4px;
   color: #fff;
@@ -62,9 +62,9 @@ body {
   border: 1px solid #253550;
   border-radius: 8px;
   color: #6b7a99;
-  font-size: 15px;
-  width: 32px;
-  height: 32px;
+  font-size: 20px;
+  width: 29px;
+  height: 29px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -139,10 +139,11 @@ body {
 
 .home-greeting {
   margin: 0;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   color: #4a5a78;
   letter-spacing: 0.01em;
+  padding-bottom: 8px;
 }
 
 .home-cards {
@@ -215,7 +216,7 @@ body {
   background: linear-gradient(135deg, #0a3820 0%, #0c4a2a 55%, #0d5532 100%);
   border: 1px solid #1a6b3c;
   border-radius: 14px;
-  padding: 18px 20px;
+  padding: 15px 18px;
   overflow: hidden;
 }
 

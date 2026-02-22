@@ -44,18 +44,18 @@ function initLockInTube() {
 
   // ── Blacklist tags ───────────────────────────────────────────
 
-  blackListAddBtn.addEventListener("click", () => {
-    const tag = blackListTagInput.value.trim().toLowerCase();
-    if (!tag) return;
-    chrome.storage.sync.get(["blacklist"], (result) => {
-      const blacklist = result.blacklist || [];
-      if (!blacklist.includes(tag)) blacklist.push(tag);
-      chrome.storage.sync.set({ blacklist }, () => {
-        blackListTagInput.value = "";
-        renderBlacklist();
-      });
+ blackListAddBtn.addEventListener("click", () => {
+  const tag = blackListTagInput.value.trim().toLowerCase();
+  if (!tag) return;
+  chrome.storage.local.get(["blacklist"], (result) => {
+    const blacklist = result.blacklist || [];
+    if (!blacklist.includes(tag)) blacklist.push(tag);
+    chrome.storage.local.set({ blacklist }, () => {
+      blackListTagInput.value = "";
+      renderBlacklist();
     });
   });
+});
 
   bClearBtn.addEventListener("click", () => {
     chrome.storage.sync.set({ blacklist: [] }, () => {
@@ -85,7 +85,7 @@ function initLockInTube() {
   }
 
   function renderBlacklist() {
-    chrome.storage.sync.get(["blacklist"], (result) => {
+    chrome.storage.local.get(["blacklist"], (result) => {
       const blacklist = result.blacklist || [];
       const list = document.getElementById("blacklistTagList");
       list.innerHTML = "";

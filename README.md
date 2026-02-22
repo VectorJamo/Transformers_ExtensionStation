@@ -27,7 +27,7 @@ Summarize any webpage or ask a question about it using a locally running AI mode
 
 1. **Clone or download this repo**
    ```bash
-   git clone https://github.com/VectorJamo/Hacked-2025-Transformers.git
+   git clone https://github.com/VectorJamo/Transformers_ExtensionStation.git
    ```
 
 2. **Open Chrome** and go to `chrome://extensions`

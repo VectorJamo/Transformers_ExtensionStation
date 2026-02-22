@@ -34,7 +34,7 @@ Summarize any webpage or ask a question about it using a locally running AI mode
 
 3. **Enable Developer Mode** — toggle in the top right corner
 
-4. **Click "Load unpacked"** and select the `ExtensionHub` folder
+4. **Click "Load unpacked"** and select the `Transformers_ExtensionStation` folder
 
 5. **Click the extension icon** in your toolbar to open it
 

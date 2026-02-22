@@ -36,6 +36,11 @@
       "matches": ["https://*.youtube.com/*"],
       "js": ["content/lockingtube-content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/summarize-content.js"],
+      "run_at": "document_idle"
     }
   ],
 

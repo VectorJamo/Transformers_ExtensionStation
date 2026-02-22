@@ -712,3 +712,20 @@ body {
   font-size: 14px;
   color: #3d5070;
 }
+
+/* ── Summarize loader ─────────────────────────────────────── */
+#summarizeSection .loader {
+  display: none;
+  margin: 12px auto 0;
+  border: 3px solid #1a2840;
+  border-top: 3px solid #2f6df6;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

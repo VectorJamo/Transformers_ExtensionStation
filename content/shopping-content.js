@@ -1,216 +1,172 @@
+//rules for each sites
+const SITES = {
+  amazon: {
+    match:     h => h.includes('amazon'),
+    isProduct: path => /\/dp\/[A-Z0-9]{10}/i.test(path),
+    getTitle:  path => {
+      const parts = path.split('/').filter(Boolean);
+      const i = parts.indexOf('dp');
+      return i > 0 && parts[i - 1].includes('-') ? parts[i - 1] : null;
+    },
+    priceSelectors: [
+      'span.a-price .a-offscreen',
+      '#priceblock_ourprice',
+      '#priceblock_dealprice',
+      '#price_inside_buybox',
+      '.priceToPay .a-offscreen',
+      '#corePrice_feature_div .a-price .a-offscreen',
+      '.a-price .a-offscreen',
+    ],
+  },
 
-const hostname = window.location.hostname;
+  walmart: {
+    match:     h => h.includes('walmart'),
+    isProduct: path => /\/ip\//.test(path),
+    getTitle:  path => {
+      const parts = path.split('/');
+      const i = parts.indexOf('ip');
+      const slug = parts[i + 1];
+      return slug && !/^\d+$/.test(slug) ? slug : null;
+    },
+    priceSelectors: [
+      '[data-automation="buybox-price"]',
+      'span[data-automation="buybox-price"]',
+      '[data-testid="price-wrap"] span',
+      '[data-testid="buybox-price-container"] span',
+      '[class*="PriceDisplay"] [class*="price"]',
+      '[class*="buybox"] [class*="price"]',
+      '[itemprop="price"]',
+      '.price-characteristic',
+      '[class*="priceDisplay"]',
+      '[class*="price-group"]',
+      'span[class*="price"]',
+    ],
+  },
 
-const CURRENT_SITE =
-  hostname.includes('amazon')              ? 'amazon'     :
-  hostname.includes('walmart')             ? 'walmart'    :
-  hostname.includes('bestbuy')             ? 'bestbuy'    :
-  hostname.includes('superstore') ||
-  hostname.includes('realcanadiansuperstore') ? 'superstore' :
-  null;
+  bestbuy: {
+    match:     h => h.includes('bestbuy'),
+    isProduct: path => path.includes('/en-ca/product/') || /\/\d+\.aspx/.test(path),
+    getTitle:  path => {
+      const parts = path.split('/').filter(Boolean);
+      const i = parts.findIndex(p => /^\d+(\.aspx)?$/.test(p));
+      return i > 0 ? parts[i - 1] : null;
+    },
+    priceSelectors: [
+      '[data-automation="product-price"]',
+      '.priceValue',
+      '.sr-only + span',
+      '[class*="price"] [class*="value"]',
+      '[itemprop="price"]',
+    ],
+  },
+
+  superstore: {
+    match:     h => h.includes('superstore') || h.includes('realcanadiansuperstore'),
+    isProduct: path => path.includes('/p/') || path.includes('/product/') || /\/\d{5,}/.test(path),
+    getTitle:  path => {
+      const parts = path.split('/').filter(Boolean);
+      const i = parts.findIndex(p => p === 'p' || p === 'product');
+      const slug = parts[i + 1];
+      const isCode = slug && (/^[\d_]+$/.test(slug) || /^\d+[_A-Z]+$/i.test(slug));
+      return slug && !isCode ? slug : null;
+    },
+    priceSelectors: [
+      '[data-code="price"]',
+      '.price--sale',
+      '.price',
+      '[itemprop="price"]',
+      '[class*="Price"]',
+    ],
+  },
+};
+
+//checking which specific site we are on(hostname)
+const CURRENT_SITE = Object.keys(SITES).find(
+  key => SITES[key].match(window.location.hostname)
+) ?? null;
 
 if (!CURRENT_SITE) {
-  // Silently exit on unsupported sites
   throw new Error('[SaveMate] Not a supported site.');
 }
 
-// ─── IS THIS A PRODUCT PAGE? ─────────────────────────────────
+const site = SITES[CURRENT_SITE];
 
+//checking URL pattern to see if we are in product page
 function isProductPage() {
-  const path = window.location.pathname;
-  if (CURRENT_SITE === 'amazon')     return /\/dp\/[A-Z0-9]{10}/i.test(path);
-  // Walmart CA uses /en/ip/... or /ip/... 
-  if (CURRENT_SITE === 'walmart')    return /\/ip\//.test(path);
-  if (CURRENT_SITE === 'bestbuy')    return path.includes('/en-ca/product/') || /\/\d+\.aspx/.test(path);
-  // Superstore uses /p/name/code or just check for a product code at end
-  if (CURRENT_SITE === 'superstore') return path.includes('/p/') || path.includes('/product/') || /\/\d{5,}/.test(path);
-  return false;
+  return site.isProduct(window.location.pathname);
 }
 
-// ─── TITLE FROM URL ──────────────────────────────────────────
-// URL slug is always available immediately — no JS render wait.
-
+//getting product name from url
 function getTitleFromUrl() {
-  const path = window.location.pathname;
   try {
-    if (CURRENT_SITE === 'walmart') {
-      // Walmart CA: /en/ip/Product-Name-Here/ID  OR  /ip/Product-Name/ID
-      const parts = path.split('/');
-      const ipIdx = parts.indexOf('ip');
-      if (ipIdx >= 0 && parts[ipIdx + 1]) {
-        const slug = parts[ipIdx + 1];
-        // Skip if it's a pure numeric ID (sometimes Walmart puts ID first)
-        if (!/^\d+$/.test(slug)) {
-          return slug.replace(/-/g, ' ').trim();
-        }
-      }
-      // Fallback: DOM h1 (Walmart renders this quickly)
-      const h1 = document.querySelector('h1[itemprop="name"], h1[class*="prod-title"], h1');
-      if (h1) return h1.textContent.trim().split('\n')[0].trim();
-    }
-
-    if (CURRENT_SITE === 'amazon') {
-      // /Product-Name-Here/dp/ASIN  OR  /dp/ASIN (no name)
-      const parts = path.split('/').filter(Boolean);
-      const dpIdx = parts.indexOf('dp');
-      if (dpIdx > 0 && parts[dpIdx - 1].includes('-')) {
-        return parts[dpIdx - 1].replace(/-/g, ' ').trim();
-      }
-      // Fallback: try page <title> tag (usually "Product Name : Amazon.ca")
-      const titleEl = document.querySelector('title');
-      if (titleEl) {
-        return titleEl.textContent.split(':')[0].split('|')[0].trim();
-      }
-    }
-
-    if (CURRENT_SITE === 'bestbuy') {
-      // /en-ca/product/brand-product-name/12345.aspx
-      const parts = path.split('/').filter(Boolean);
-      // Find the segment before the numeric ID segment
-      const productSegIdx = parts.findIndex(p => /^\d+\.aspx$/.test(p) || /^\d+$/.test(p));
-      if (productSegIdx > 0) {
-        return parts[productSegIdx - 1].replace(/-/g, ' ').trim();
-      }
-    }
-
-    if (CURRENT_SITE === 'superstore') {
-      // Superstore URL: /p/Product-Name-Here/21302823_EA
-      // The slug BEFORE the last segment is the name; the last is a numeric code
-      const parts = path.split('/').filter(Boolean);
-      const pIdx  = parts.findIndex(p => p === 'p' || p === 'product');
-      if (pIdx >= 0 && parts[pIdx + 1]) {
-        const candidate = parts[pIdx + 1];
-        // Skip if it's a pure numeric/code segment like "21302823_EA" or "123456"
-        const isCode = /^[\d_]+$/.test(candidate) || /^\d+[_A-Z]+$/i.test(candidate);
-        if (!isCode) {
-          return candidate.replace(/-/g, ' ').trim();
-        }
-      }
-      // Fallback: use the page <title> — Superstore sets it to the product name
-      const titleEl = document.querySelector('title, h1');
-      if (titleEl) {
-        return titleEl.textContent.split('|')[0].split('-')[0].split(':')[0].trim();
-      }
-    }
+    const fromUrl = site.getTitle(window.location.pathname);
+    if (fromUrl) return fromUrl.replace(/-/g, ' ').trim();
   } catch (_) {}
 
-  // Universal fallback: page <title>
-  const titleEl = document.querySelector('title');
-  if (titleEl) {
-    return titleEl.textContent.split(':')[0].split('|')[0].split('-')[0].trim();
-  }
+  // Universal DOM fallback
+  const el = document.querySelector('title, h1');
+  if (el) return el.textContent.split(/[:|–\-]/)[0].trim();
   return null;
 }
 
-// ─── TITLE CLEANUP ───────────────────────────────────────────
-// Remove junk like sizes, colors, variant codes from the slug
-// so the cross-site search finds the right product type.
-
+//cleaning the overall title with common words
 function cleanTitle(raw) {
   if (!raw) return null;
   return raw
-    // Remove common noise patterns
     .replace(/\b(with|the|a|an|for|set of|pack of|lot of)\b/gi, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
     .substring(0, 100);
 }
 
-// ─── PRICE FROM DOM ──────────────────────────────────────────
-
-const PRICE_SELECTORS = {
-  amazon: [
-    'span.a-price .a-offscreen',          // Main price
-    '#priceblock_ourprice',
-    '#priceblock_dealprice',
-    '#price_inside_buybox',
-    '.priceToPay .a-offscreen',
-    '#corePrice_feature_div .a-price .a-offscreen',
-    '.a-price .a-offscreen',
-  ],
-  walmart: [
-    // Walmart CA — try every known price selector pattern
-    '[data-automation="buybox-price"]',
-    'span[data-automation="buybox-price"]',
-    '[data-testid="price-wrap"] span',
-    '[data-testid="buybox-price-container"] span',
-    '[class*="PriceDisplay"] [class*="price"]',
-    '[class*="buybox"] [class*="price"]',
-    '[itemprop="price"]',
-    '.price-characteristic',
-    '[class*="priceDisplay"]',
-    '[class*="price-group"]',
-    'span[class*="price"]',
-  ],
-  bestbuy: [
-    '[data-automation="product-price"]',
-    '.priceValue',
-    '.sr-only + span',
-    '[class*="price"] [class*="value"]',
-    '[itemprop="price"]',
-  ],
-  superstore: [
-    '[data-code="price"]',
-    '.price--sale',
-    '.price',
-    '[itemprop="price"]',
-    '[class*="Price"]',
-  ],
-};
-
-function extractText(selectors) {
-  for (const sel of selectors) {
+//trying CSS selector for the site to find a valid price, from it
+function getPrice() {
+  for (const sel of site.priceSelectors) {
     try {
       const el = document.querySelector(sel);
-      if (el) {
-        const t =
-          el.getAttribute('content') ||   // itemprop="price" uses content attr
-          el.innerText?.trim()          ||
-          el.textContent?.trim();
-        if (t && t.length > 0 && t.length < 30) return t;
-      }
+      if (!el) continue;
+      const raw =
+        el.getAttribute('content') ||
+        el.innerText?.trim()       ||
+        el.textContent?.trim();
+      if (!raw || raw.length === 0 || raw.length >= 30) continue;
+      const m = raw.replace(/,/g, '').match(/\d+\.?\d*/);
+      if (!m) continue;
+      const p = parseFloat(m[0]);
+      if (p > 0 && p < 100000) return p;
     } catch (_) {}
   }
   return null;
 }
 
-function parsePrice(raw) {
-  if (!raw) return null;
-  const m = raw.replace(/,/g, '').match(/\d+\.?\d*/);
-  if (!m) return null;
-  const p = parseFloat(m[0]);
-  return (p > 0 && p < 100000) ? p : null;
-}
-
-// ─── MAIN DETECTION ──────────────────────────────────────────
-
+//combining the information we extracted into a object
 function getProductData() {
   if (!isProductPage()) return null;
 
   const rawTitle = getTitleFromUrl();
   const title    = cleanTitle(rawTitle);
-  const rawPrice = extractText(PRICE_SELECTORS[CURRENT_SITE]);
-  const price    = parsePrice(rawPrice);
+  const price    = getPrice();
 
   console.log(`[SaveMate] Site: ${CURRENT_SITE} | Title: "${title}" | Price: ${price}`);
 
-  if (!title) return null;      // Need at least a title
+  if (!title) return null;
   // Price can be null — we still want to show comparison prices
 
   return {
-    title:  title.substring(0, 120),
-    price:  price,
-    site:   CURRENT_SITE,
-    url:    window.location.href,
+    title: title.substring(0, 120),
+    price: price,
+    site:  CURRENT_SITE,
+    url:   window.location.href,
   };
 }
 
 // ─── SPA NAVIGATION WATCHER ──────────────────────────────────
 
-let lastUrl  = '';
-let lastKey  = '';
+let lastUrl   = '';
+let lastKey   = '';
 let initTimer = null;
 
+//extracting the unique ID for curr product
 function getProductKey() {
   const path = window.location.pathname;
   if (CURRENT_SITE === 'amazon')  { const m = path.match(/\/dp\/([A-Z0-9]{10})/i); return m ? m[1] : path; }
@@ -218,6 +174,7 @@ function getProductKey() {
   return path;
 }
 
+//just the timer
 setInterval(() => {
   const currentUrl = window.location.href;
   const currentKey = getProductKey();
@@ -234,8 +191,7 @@ setInterval(() => {
   }
 }, 800);
 
-// ─── BUY POPUP (3.5 min timer) ───────────────────────────────
-
+//the pop up logic
 let buyTimer   = null;
 let popupShown = false;
 const DELAY_MS = 15 * 1000;
@@ -248,6 +204,8 @@ function startTimer(product) {
   }, DELAY_MS);
 }
 
+
+//adding the popus css to the page after time
 function injectStyles() {
   if (document.getElementById('sm-styles')) return;
   const s = document.createElement('style');
@@ -271,6 +229,7 @@ function injectStyles() {
   document.head.appendChild(s);
 }
 
+//rendering
 function showBuyPopup(product) {
   if (popupShown || !product?.price) return;
   popupShown = true;
@@ -304,8 +263,7 @@ function showBuyPopup(product) {
   document.getElementById('sm-dismiss').onclick = () => popup.remove();
 }
 
-// ─── INIT ────────────────────────────────────────────────────
-
+//initializing
 function init() {
   const product = getProductData();
   if (!product) {
